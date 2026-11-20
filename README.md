@@ -11,19 +11,21 @@ I did not use the switch at all, but instead altered the code to learn the top a
 A different (similar type, but specifics matter) N20 motor was used: a brushed motor with a metal gearbox and encoder. 
 
 In this case, it was: https://www.amazon.co.uk/dp/B0F8N6THR5?ref=ppx_yo2ov_dt_b_fed_asin_title&th=1
-<img width="2631" height="1315" alt="image" src="https://github.com/user-attachments/assets/83406372-54ad-4f00-abca-a482c309a512" />
+
 <img width="1059" height="1649" alt="image" src="https://github.com/user-attachments/assets/a5e98525-e5e9-42dc-be80-347920c015a2" />
 
 A different ESP board was used (ESP32-C3 mini board) with different GPIOS utilised
 
 <img width="400" height="840" alt="image" src="https://github.com/user-attachments/assets/99a89f60-ef29-4585-828b-2351c7bf0294" />
 
- which meant wiring changed to this:
-
 sourced from: 
 https://www.amazon.co.uk/dp/B0F8M9JWCG?ref=ppx_yo2ov_dt_b_fed_asin_title
 
-Electronics are a work in progress on proto board, and no enclosure has been built yet.
+which meant wiring changed to this:
+
+ <img width="2631" height="1315" alt="image" src="https://github.com/user-attachments/assets/83406372-54ad-4f00-abca-a482c309a512" />
+
+Electronics HW is a work in progress on proto board, and no enclosure has been built yet.  Perhaps a PCB but I only want a few of these so probably just hand build like this one.
 
 <img width="600" height="800" alt="WhatsApp Image 2026-11-20 at 11 19 39" src="https://github.com/user-attachments/assets/58942a6b-7199-4525-b1f9-6348894760e9" />
 <img width="600" height="800" alt="WhatsApp Image 2026-11-20 at 11 21 23" src="https://github.com/user-attachments/assets/f9ee6ff0-0f27-4680-bdaa-20cb5be54bef" />
