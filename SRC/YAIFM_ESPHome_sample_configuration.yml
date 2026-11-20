@@ -1,167 +1,459 @@
-#Copyright (c) 2024 AndBu and others
-#
-#Permission is hereby granted, free of charge, to any person obtaining
-#a copy of this software and associated documentation files (the
-#"Software"), to deal in the Software without restriction, including
-#without limitation the rights to use, copy, modify, merge, publish,
-#distribute, sublicense, and/or sell copies of the Software, and to
-#permit persons to whom the Software is furnished to do so, subject to
-#the following conditions:
-#
-#The above copyright notice and this permission notice shall be
-#included in all copies or substantial portions of the Software.
-#
-#THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-#EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-#MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-#NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
-#LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-#OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
-#WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-#This is a proof-of-concept automation template for the YAIFM
-#"Yet another IKEA Fridans Motoriozation Project"
+# ============================================================
+# SMART BLIND - ESP32-C3 / DRV8833
+# ESPHome 2026.10.2
 #
-#The source can be found on GitHub:https://github.com/AndBu/YAIFM
+# UP   = H-bridge REVERSE
+# DOWN = H-bridge FORWARD
 #
-#This script assumes you have a Wemos D1 Mini ESP8266 board. If you
-#have another board, change the board type and pin assigment. On an 
-#ESP32 board, it is recommended to switch to the hardware PWM as 
-#described here: https://esphome.io/components/output/ledc
+# GPIO6/7 = Motor driver
+# GPIO4/5 = Rotary encoder
+# GPIO10  = Manual motor inhibit (closed = inhibited)
 #
-#This script requires the end stop switch, if you don't want to use the
-#end stop switch, write your own script and share it please ;)
+# Normal controls:
+#   OPEN / CLOSE = Run to learned limits
+#   STOP = Stop immediately
+#
+# Calibration controls (limits bypassed):
+#   UP NUDGE / DOWN NUDGE = 20 encoder counts
+#   UP CONTINUOUS / DOWN CONTINUOUS = run until STOP
+#   SET TOP / SET BOTTOM = record new limits
+#   RESET LIMITS = clear old calibration
+#
+# PWM = 20kHz; adjustable speed 30-100%, initial 60%
+# ============================================================
 
 esphome:
-  name: <your_device_name>
-  friendly_name: <your_friendly_name>
-  on_boot:
-    priority: 600
-    # This ensures that the blind has to be pulled up and hit the limit switch on the first boot
-    then:
-      - cover.template.publish:
-          id: screen
-          state: CLOSED
-          current_operation: IDLE
-      - sensor.rotary_encoder.set_value:
-          id: re_mot
-          value: 0      
-esp8266:
-  board: d1_mini 
+  name: smartblind-brushed-1
+  friendly_name: Smart Blind Brushed 1
 
-# Enable Home Assistant API
+esp32:
+  variant: esp32c3
+  framework:
+    type: esp-idf
+
+logger:
+  baud_rate: 0
+
+preferences:
+  flash_write_interval: 10s
+
 api:
   encryption:
-    key: <your_device_key>
+    key: ""
 
 ota:
-  password: <your_password_name>
+  - platform: esphome
+    encryption:
 
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
-
-  # Enable fallback hotspot (captive portal) in case wifi connection fails
   ap:
-    ssid: <your_hotspot_fallback_ssid>
-    password: <your_hotspot_fallback_password>
+    ssid: SMARTBLIND1 Fallback Hotspot
+    password: ""
 
-# Disable logging via serial since we are using the pins of the serial port
-logger:
-  baud_rate: 0
+captive_portal:
 
-# Configure the pins for PWM
+web_server:
+  version: 2
+  auth:
+    username: smartblind1
+    password: !secret web_password
+    type: digest
+
+# ============================================================
+# MOTOR OUTPUTS
+# ============================================================
+
 output:
-  # Blinds (+) and (-) leads for motor
-  - platform: esp8266_pwm
+  - platform: ledc
     id: mot_m1
-    pin: GPIO14 #D6 on te WeMos D1 MINI  
-  - platform: esp8266_pwm
-    id: mot_m2
-    pin: GPIO12 #D5 on te WeMos D1 MINI
+    pin: GPIO6
+    frequency: 10kHz
 
+  - platform: ledc
+    id: mot_m2
+    pin: GPIO7
+    frequency: 10kHz
+
+fan:
+  - platform: hbridge
+    id: mot
+    name: "Motor"
+    internal: true
+    pin_a: mot_m1
+    pin_b: mot_m2
+    decay_mode: SLOW
+    speed_count: 100
+
+# ============================================================
+# ADJUSTABLE MOTOR SPEED
+# ============================================================
+
+number:
+  - platform: template
+    name: "Motor Speed"
+    id: motor_speed
+    min_value: 30
+    max_value: 100
+    step: 5
+    initial_value: 60
+    restore_value: true
+    optimistic: true
+
+# ============================================================
+# MOTOR INHIBIT
+# GPIO10 grounded = switch closed = motor disabled
+# ============================================================
 
 binary_sensor:
-  # End stop
   - platform: gpio
-    id: sw_mot
-    name: "End Stop"
-    internal: True
+    id: motor_inhibit
+    name: "Motor Inhibit"
     pin:
-      number: 13 #D7 on te WeMos D1 MINI
+      number: GPIO10
       inverted: true
-      # The end stop  switch is naturally closed.
-      # If there is an open circuit (i.e. broken connection),
-      # we want that to be detected, hence the pullup)
       mode:
         input: true
         pullup: true
 
-sensor:
-- platform: rotary_encoder
-  name: "Motor encoder"
-  internal: False
-  id: re_mot
-  pin_b: GPIO4  #D2 on te WeMos D1 MINI
-  pin_a: GPIO5  #D1 on te WeMos D1 MINI
-- platform: template
-  name: "Initialized"
-  lambda: |-
-    return id(init_done);
-  update_interval: 0.1s
+    on_press:
+      - script.stop: motor_move
+      - script.stop: calibration_continuous
+      - fan.turn_off: mot
+      - fan.hbridge.brake: mot
+      - cover.template.publish:
+          id: screen
+          current_operation: IDLE
+      - logger.log: "Motor inhibited by physical switch"
 
-fan:
-  # Motor controller
-  - platform: hbridge
-    id: mot
-    name: "Motor"
-    internal: True
-    pin_a: mot_m1
-    pin_b: mot_m2
-    decay_mode: slow
+# ============================================================
+# ROTARY ENCODER AND DIAGNOSTIC SENSORS
+# ============================================================
+
+sensor:
+  - platform: rotary_encoder
+    id: re_mot
+    name: "Motor Encoder"
+    pin_a: GPIO5
+    pin_b: GPIO4
+    restore_mode: RESTORE_DEFAULT_ZERO
+    publish_initial_value: true
+
+  - platform: template
+    name: "Top Limit Count"
+    lambda: |-
+      return id(top_limit_count);
+    update_interval: 1s
+
+  - platform: template
+    name: "Bottom Limit Count"
+    lambda: |-
+      return id(bottom_limit_count);
+    update_interval: 1s
+
+  - platform: template
+    name: "Blind Travel Counts"
+    lambda: |-
+      if (!id(calibration_valid)) return NAN;
+      return abs(id(bottom_limit_count) -
+                 id(top_limit_count));
+    update_interval: 1s
+
+# ============================================================
+# PERSISTENT GLOBALS
+# ============================================================
 
 globals:
-  - id: init_done
-    type: bool
-    restore_value: yes
-    initial_value: 'false'
-  - id: min_value
+  - id: top_limit_count
     type: int
     restore_value: yes
     initial_value: '0'
-  - id: max_value
+
+  - id: bottom_limit_count
     type: int
     restore_value: yes
     initial_value: '23000'
 
-number:
-  - platform: template
-    name: "Screen Minimum Value"
-    id: screen_min_value
-    optimistic: True
-    restore_value: True
-    initial_value: 0
-    min_value: 0
-    max_value: 50000
-    step: 100
-    set_action:
-      - lambda: |-
-          ESP_LOGI("set_min_value", "Setting min_value to %d", (int)x);
-          id(min_value) = (int)x;
+  - id: top_limit_set
+    type: bool
+    restore_value: yes
+    initial_value: 'false'
 
-  - platform: template
-    name: "Screen Maximum Value"
-    id: screen_max_value
-    optimistic: true
-    restore_value: True
-    initial_value: 23000
-    min_value: 0
-    max_value: 50000
-    step: 100
-    set_action:
-      - lambda: |-
-          ESP_LOGI("set_max_value", "Setting max_value to %d", (int)x);
-          id(max_value) = (int)x;
+  - id: bottom_limit_set
+    type: bool
+    restore_value: yes
+    initial_value: 'false'
+
+  - id: calibration_valid
+    type: bool
+    restore_value: yes
+    initial_value: 'false'
+
+  - id: count_increases_down
+    type: bool
+    restore_value: yes
+    initial_value: 'true'
+
+  - id: move_start_count
+    type: int
+    restore_value: no
+    initial_value: '0'
+
+  - id: move_start_ms
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
+
+# ============================================================
+# MOTOR SCRIPTS
+#
+# motor_move:
+#   used by normal cover actions and short calibration nudges
+#   ignore_limits=true for calibration nudges
+#
+# calibration_continuous:
+#   bypasses learned limits; stops on STOP, inhibit or 5 min
+# ============================================================
+
+script:
+  # Normal travel and 20-count nudge
+  - id: motor_move
+    mode: restart
+    parameters:
+      move_down: bool
+      use_target: bool
+      target_count: int
+      jog: bool
+      ignore_limits: bool
+
+    then:
+      - script.stop: calibration_continuous
+
+      - if:
+          condition:
+            lambda: |-
+              return !id(motor_inhibit).state &&
+                     (!use_target || id(calibration_valid));
+
+          then:
+            - fan.turn_off: mot
+            - fan.hbridge.brake: mot
+            - delay: 100ms
+
+            - lambda: |-
+                id(move_start_count) = (int) id(re_mot).state;
+                id(move_start_ms) = millis();
+
+            # Check whether movement is permitted from current position
+            - if:
+                condition:
+                  lambda: |-
+                    int c = (int) id(re_mot).state;
+
+                    if (id(motor_inhibit).state)
+                      return false;
+
+                    // Calibration nudges deliberately bypass old limits
+                    if (id(calibration_valid) && !ignore_limits) {
+                      if (move_down) {
+                        if (id(count_increases_down) ?
+                            c >= id(bottom_limit_count) :
+                            c <= id(bottom_limit_count))
+                          return false;
+                      } else {
+                        if (id(count_increases_down) ?
+                            c <= id(top_limit_count) :
+                            c >= id(top_limit_count))
+                          return false;
+                      }
+                    }
+
+                    if (use_target) {
+                      if (move_down)
+                        return id(count_increases_down) ?
+                            c < target_count :
+                            c > target_count;
+                      else
+                        return id(count_increases_down) ?
+                            c > target_count :
+                            c < target_count;
+                    }
+
+                    return true;
+
+                then:
+                  # UP = REVERSE; DOWN = FORWARD
+                  - if:
+                      condition:
+                        lambda: 'return move_down;'
+                      then:
+                        - if:
+                            condition:
+                              lambda: 'return jog;'
+                            then:
+                              - fan.turn_on:
+                                  id: mot
+                                  direction: forward
+                                  speed: !lambda 'return (int) id(motor_speed).state;'
+                            else:
+                              # Soft start for normal travel
+                              - fan.turn_on:
+                                  id: mot
+                                  direction: forward
+                                  speed: 30
+                              - delay: 150ms
+                              - fan.turn_on:
+                                  id: mot
+                                  direction: forward
+                                  speed: !lambda 'return (int) id(motor_speed).state;'
+                      else:
+                        - if:
+                            condition:
+                              lambda: 'return jog;'
+                            then:
+                              - fan.turn_on:
+                                  id: mot
+                                  direction: reverse
+                                  speed: !lambda 'return (int) id(motor_speed).state;'
+                            else:
+                              # Soft start for normal travel
+                              - fan.turn_on:
+                                  id: mot
+                                  direction: reverse
+                                  speed: 30
+                              - delay: 150ms
+                              - fan.turn_on:
+                                  id: mot
+                                  direction: reverse
+                                  speed: !lambda 'return (int) id(motor_speed).state;'
+
+                  - wait_until:
+                      condition:
+                        lambda: |-
+                          int c = (int) id(re_mot).state;
+
+                          if (id(motor_inhibit).state)
+                            return true;
+
+                          // Calibration jog: 20 counts or 5 seconds
+                          if (jog) {
+                            if (abs(c - id(move_start_count)) >= 20)
+                              return true;
+                            if ((uint32_t)(millis() -
+                                id(move_start_ms)) >= 5000)
+                              return true;
+                          }
+
+                          // Learned limits apply to normal movement only
+                          if (id(calibration_valid) && !ignore_limits) {
+                            if (move_down) {
+                              if (id(count_increases_down) ?
+                                  c >= id(bottom_limit_count) :
+                                  c <= id(bottom_limit_count))
+                                return true;
+                            } else {
+                              if (id(count_increases_down) ?
+                                  c <= id(top_limit_count) :
+                                  c >= id(top_limit_count))
+                                return true;
+                            }
+                          }
+
+                          // Intermediate cover target
+                          if (use_target) {
+                            if (move_down)
+                              return id(count_increases_down) ?
+                                  c >= target_count :
+                                  c <= target_count;
+                            else
+                              return id(count_increases_down) ?
+                                  c <= target_count :
+                                  c >= target_count;
+                          }
+
+                          return false;
+                      timeout: 120s
+
+                  - fan.turn_off: mot
+                  - fan.hbridge.brake: mot
+
+            - fan.turn_off: mot
+            - fan.hbridge.brake: mot
+            - cover.template.publish:
+                id: screen
+                current_operation: IDLE
+
+          else:
+            - logger.log:
+                level: WARN
+                format: "Motor command rejected: inhibited or not calibrated"
+
+  # Continuous calibration movement - bypasses all learned limits
+  - id: calibration_continuous
+    mode: restart
+    parameters:
+      move_down: bool
+
+    then:
+      - script.stop: motor_move
+
+      - if:
+          condition:
+            lambda: 'return !id(motor_inhibit).state;'
+          then:
+            - fan.turn_off: mot
+            - fan.hbridge.brake: mot
+            - delay: 100ms
+
+            # Soft start
+            - if:
+                condition:
+                  lambda: 'return move_down;'
+                then:
+                  - fan.turn_on:
+                      id: mot
+                      direction: forward
+                      speed: 30
+                  - delay: 150ms
+                  - fan.turn_on:
+                      id: mot
+                      direction: forward
+                      speed: !lambda 'return (int) id(motor_speed).state;'
+                else:
+                  - fan.turn_on:
+                      id: mot
+                      direction: reverse
+                      speed: 30
+                  - delay: 150ms
+                  - fan.turn_on:
+                      id: mot
+                      direction: reverse
+                      speed: !lambda 'return (int) id(motor_speed).state;'
+
+            # Runs until STOP, inhibit or the 5-minute safety timeout
+            - wait_until:
+                condition:
+                  lambda: 'return id(motor_inhibit).state;'
+                timeout: 5min
+
+            - fan.turn_off: mot
+            - fan.hbridge.brake: mot
+            - cover.template.publish:
+                id: screen
+                current_operation: IDLE
+
+          else:
+            - logger.log:
+                level: WARN
+                format: "Continuous calibration movement rejected: motor inhibited"
+
+# ============================================================
+# COVER
+# Position 1.0 = fully open
+# Position 0.0 = fully closed
+# ============================================================
 
 cover:
   - platform: template
@@ -169,163 +461,238 @@ cover:
     name: "Blind"
     id: screen
     has_position: true
+
     lambda: |-
-      // Calculate the percentage closed (reversed logic)
-      float current_position = id(re_mot).state;
-      // Clamp the value between min and max
-      if (current_position < id(min_value)) current_position = id(min_value);
-      if (current_position > id(max_value)) current_position = id(max_value);
-      // Return the percentage closed
-      return (id(max_value) - current_position) / (id(max_value) - id(min_value));
+      if (!id(calibration_valid))
+        return {};
+
+      float c = id(re_mot).state;
+      float p =
+        (id(bottom_limit_count) - c) /
+        (float)(id(bottom_limit_count) -
+                id(top_limit_count));
+
+      if (p < 0.0f) p = 0.0f;
+      if (p > 1.0f) p = 1.0f;
+      return p;
+
     position_action:
-      - lambda: |-
-          int current_position = id(re_mot).state;
-          int target_value = id(max_value) - (pos * (id(max_value) - id(min_value))); // Use 'x' for position
-          id(screen).current_operation = COVER_OPERATION_IDLE;
-
-          if (current_position < target_value) {
-            ESP_LOGI("position_action", "Current position is less than target. Moving to CLOSE.");
-            id(screen).current_operation = COVER_OPERATION_CLOSING;
-          } else if (current_position > target_value) {
-            ESP_LOGI("position_action", "Current position is greater than target. Moving to OPEN.");
-            id(screen).current_operation = COVER_OPERATION_OPENING;
-          } else {
-            ESP_LOGI("position_action", "Position already correct.");
-          }
-
       - if:
           condition:
-            lambda: "return id(screen).current_operation == COVER_OPERATION_CLOSING && id(init_done);"
+            lambda: |-
+              return id(calibration_valid) &&
+                     !id(motor_inhibit).state;
           then:
-            - fan.turn_on:
-                id: mot
-                direction: reverse
-            - wait_until:
-                lambda: |-
-                  int target_value = id(max_value) - (pos * (id(max_value) - id(min_value))); // Recalculate target_value
-                  return id(re_mot).state >= target_value;
-            - fan.turn_off: mot
-            - fan.hbridge.brake: mot
+            - lambda: |-
+                float p = pos;
+                if (p < 0.0f) p = 0.0f;
+                if (p > 1.0f) p = 1.0f;
 
-      - if:
-          condition:
-            lambda: "return id(screen).current_operation == COVER_OPERATION_OPENING && id(init_done);"
-          then:
-            - fan.turn_on:
-                id: mot
-                direction: forward
-            - wait_until:
-                lambda: |-
-                  int target_value = id(max_value) - (pos * (id(max_value) - id(min_value))); // Recalculate target_value
-                  return id(re_mot).state <= target_value;
-            - fan.turn_off: mot
-            - fan.hbridge.brake: mot
+                int target =
+                  id(top_limit_count) +
+                  (int)((1.0f - p) *
+                  (id(bottom_limit_count) -
+                   id(top_limit_count)));
 
-      - lambda: |-
-          id(screen).current_operation = COVER_OPERATION_IDLE;
-      - logger.log: "Blind position adjusted successfully."
-    close_action:
-      - if:
-          condition:
-            lambda: "return id(init_done);"
-          then:
-          - logger.log: "Rolling down blind..."
-          - cover.template.publish:
-              id: screen
-              current_operation: CLOSING
-          - fan.turn_on:
-              id: mot
-              direction: reverse
-          - wait_until:
-              condition:
-                lambda: return (id(re_mot).state) >= id(max_value);
-          - fan.turn_off: mot
-          - fan.hbridge.brake: mot
-          - cover.template.publish:
-              id: screen
-              state: CLOSED
-              current_operation: IDLE
-          - logger.log: "...blind rolled down"
-          else:
-          - logger.log: "Cannot roll down blinds; not initialized."            
+                int current = (int) id(re_mot).state;
+                bool down =
+                  ((target - current) *
+                   (id(bottom_limit_count) -
+                    id(top_limit_count))) > 0;
+
+                id(motor_move)->execute(
+                  down, true, target, false, false);
+
     open_action:
+      - script.execute:
+          id: motor_move
+          move_down: false
+          use_target: true
+          target_count: !lambda 'return id(top_limit_count);'
+          jog: false
+          ignore_limits: false
+
+    close_action:
+      - script.execute:
+          id: motor_move
+          move_down: true
+          use_target: true
+          target_count: !lambda 'return id(bottom_limit_count);'
+          jog: false
+          ignore_limits: false
+
+    stop_action:
+      - script.stop: motor_move
+      - script.stop: calibration_continuous
+      - fan.turn_off: mot
+      - fan.hbridge.brake: mot
+      - cover.template.publish:
+          id: screen
+          current_operation: IDLE
+
+# ============================================================
+# WEB BUTTONS
+# ============================================================
+
+button:
+  # Fine calibration movement - 20 counts, bypasses learned limits
+  - platform: template
+    name: "UP NUDGE"
+    id: up_nudge
+    on_press:
+      - script.execute:
+          id: motor_move
+          move_down: false
+          use_target: false
+          target_count: 0
+          jog: true
+          ignore_limits: true
+
+  - platform: template
+    name: "DOWN NUDGE"
+    id: down_nudge
+    on_press:
+      - script.execute:
+          id: motor_move
+          move_down: true
+          use_target: false
+          target_count: 0
+          jog: true
+          ignore_limits: true
+
+  # Coarse calibration movement - runs until STOP or 5-minute timeout
+  - platform: template
+    name: "UP CONTINUOUS"
+    id: up_continuous
+    on_press:
+      - script.execute:
+          id: calibration_continuous
+          move_down: false
+
+  - platform: template
+    name: "DOWN CONTINUOUS"
+    id: down_continuous
+    on_press:
+      - script.execute:
+          id: calibration_continuous
+          move_down: true
+
+  # STOP - stops either type of movement
+  - platform: template
+    name: "STOP"
+    id: manual_stop
+    on_press:
+      - script.stop: motor_move
+      - script.stop: calibration_continuous
+      - fan.turn_off: mot
+      - fan.hbridge.brake: mot
+      - cover.template.publish:
+          id: screen
+          current_operation: IDLE
+
+  # RESET LIMITS - retain encoder position and motor speed
+  - platform: template
+    name: "RESET LIMITS"
+    id: reset_limits
+    on_press:
+      - script.stop: motor_move
+      - script.stop: calibration_continuous
+      - fan.turn_off: mot
+      - fan.hbridge.brake: mot
+      - cover.template.publish:
+          id: screen
+          current_operation: IDLE
+      - delay: 100ms
+      - lambda: |-
+          id(top_limit_count) = 0;
+          id(bottom_limit_count) = 0;
+          id(top_limit_set) = false;
+          id(bottom_limit_set) = false;
+          id(calibration_valid) = false;
+          ESP_LOGW("calibration",
+                   "Limits reset. Recalibration required.");
+      - logger.log:
+          level: WARN
+          format: "LIMITS RESET - Calibration movement enabled"
+
+  # SET TOP LIMIT
+  - platform: template
+    name: "Set TOP limit"
+    id: set_top_limit
+    on_press:
+      - script.stop: motor_move
+      - script.stop: calibration_continuous
+      - fan.turn_off: mot
+      - fan.hbridge.brake: mot
+      - delay: 100ms
       - if:
           condition:
-            lambda: "return id(init_done);"
-          then:      
-          - logger.log: "Rolling up blind..."
-          - cover.template.publish:
-              id: screen
-              current_operation: OPENING
-          - fan.turn_on:
-              id: mot
-              direction: forward
-          - wait_until:
-              condition:
-                lambda: return (id(re_mot).state) <= id(min_value);
-          - fan.turn_off: mot
-          - fan.hbridge.brake: mot
-          - delay: 100 ms
-          - cover.template.publish:
-              id: screen
-              state: OPEN
-              current_operation: IDLE
-          - logger.log: "... blind rolled up."
-          else:
-          - logger.log: "Cannot roll up blinds; not initialized."                
-    stop_action:
-      - logger.log: "Stopping blind..."
-      - fan.turn_off: mot
-      - fan.hbridge.brake: mot
-      - if: # Check if we are currently moving
-          condition:
-            - lambda: "return (id(screen).position == COVER_OPEN && id(screen).current_operation == COVER_OPERATION_IDLE) || 1;"
+            lambda: 'return !id(motor_inhibit).state;'
           then:
-            - cover.template.publish:
-                id: screen
-                state: OPEN
-                current_operation: IDLE
-          else:
-            - cover.template.publish:
-                id: screen
-                state: CLOSED
-                current_operation: IDLE
-      - logger.log: "... blind stopped."
-button:
+            - lambda: |-
+                int c = (int) id(re_mot).state;
+                id(top_limit_count) = c;
+                id(top_limit_set) = true;
+                id(bottom_limit_set) = false;
+                id(calibration_valid) = false;
+                ESP_LOGI("calibration",
+                         "Top limit saved: %d", c);
+
+  # SET BOTTOM LIMIT
   - platform: template
-    name: Initialize
-    id: initialize_blind
+    name: "Set BOTTOM limit"
+    id: set_bottom_limit
     on_press:
-      - logger.log: 'Rolling up blind on init...'
-      - globals.set:
-          id: init_done
-          value: 'false'     
-      - cover.template.publish:
-          id: screen
-          current_operation: OPENING           
-      - fan.turn_on:
-          id: mot
-          direction: forward
-      - wait_until:
-          binary_sensor.is_on: sw_mot
-      - fan.turn_off: mot  
-      - fan.hbridge.brake: mot
-      - delay: 100 ms          
-      - fan.turn_on:
-          id: mot
-          direction: reverse
-      - delay: 0.2 sec
+      - script.stop: motor_move
+      - script.stop: calibration_continuous
       - fan.turn_off: mot
       - fan.hbridge.brake: mot
-      - delay: 0.3 sec
-      - sensor.rotary_encoder.set_value:
-          id: re_mot
-          value: 0                        
-      - cover.template.publish:
-          id: screen
-          state: OPEN
-          current_operation: IDLE
-      - globals.set:
-          id: init_done
-          value: 'true'          
-      - logger.log: '... blind initialized successfully.'
+      - delay: 100ms
+      - if:
+          condition:
+            lambda: |-
+              return !id(motor_inhibit).state &&
+                     id(top_limit_set);
+          then:
+            - lambda: |-
+                int c = (int) id(re_mot).state;
+                int t = id(top_limit_count);
+                int travel = abs(c - t);
+
+                id(bottom_limit_count) = c;
+                id(bottom_limit_set) = true;
+
+                if (travel < 100 || travel > 50000) {
+                  id(calibration_valid) = false;
+                  ESP_LOGE("calibration",
+                           "Invalid travel: %d counts", travel);
+                } else {
+                  id(count_increases_down) = (c > t);
+                  id(calibration_valid) = true;
+                  ESP_LOGI("calibration",
+                           "Calibration accepted. Top=%d Bottom=%d Travel=%d",
+                           t, c, travel);
+                }
+          else:
+            - logger.log:
+                level: ERROR
+                format: "Set TOP limit first or motor is inhibited"
+
+# ============================================================
+# CALIBRATION STATUS
+# ============================================================
+
+text_sensor:
+  - platform: template
+    name: "Calibration Status"
+    update_interval: 1s
+    lambda: |-
+      if (id(motor_inhibit).state)
+        return {"MOTOR INHIBITED"};
+      if (!id(top_limit_set))
+        return {"TOP LIMIT NOT SET"};
+      if (!id(bottom_limit_set))
+        return {"BOTTOM LIMIT NOT SET"};
+      if (!id(calibration_valid))
+        return {"CALIBRATION ERROR"};
+      return {"CALIBRATED"};
