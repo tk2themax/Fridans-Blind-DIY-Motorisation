@@ -14,14 +14,18 @@ In this case, it was: https://www.amazon.co.uk/dp/B0F8N6THR5?ref=ppx_yo2ov_dt_b_
 
 <img width="600" height="800" alt="image" src="https://github.com/user-attachments/assets/a5e98525-e5e9-42dc-be80-347920c015a2" />
 
+
 A different ESP board was used (ESP32-C3 mini board) with different GPIOS utilised
 
+
 <img width="400" height="840" alt="image" src="https://github.com/user-attachments/assets/99a89f60-ef29-4585-828b-2351c7bf0294" />
+
 
 sourced from: 
 https://www.amazon.co.uk/dp/B0F8M9JWCG?ref=ppx_yo2ov_dt_b_fed_asin_title
 
 which meant wiring changed to this:
+
 
  <img width="2631" height="1315" alt="image" src="https://github.com/user-attachments/assets/83406372-54ad-4f00-abca-a482c309a512" />
 
@@ -29,6 +33,7 @@ Electronics HW is a work in progress on proto board, and no enclosure has been b
 
 <img width="600" height="800" alt="WhatsApp Image 2026-11-20 at 11 19 39" src="https://github.com/user-attachments/assets/58942a6b-7199-4525-b1f9-6348894760e9" />
 <img width="600" height="800" alt="WhatsApp Image 2026-11-20 at 11 21 23" src="https://github.com/user-attachments/assets/f9ee6ff0-0f27-4680-bdaa-20cb5be54bef" />
+
 
 The motor is a little noisy, but lowering the speed makes it okay. This is not perfect, but I did not want to use a switch, which was too clunky for my taste.  An absolute physical nd stop with a swithing component may transpire as wise - time will tell.
 
