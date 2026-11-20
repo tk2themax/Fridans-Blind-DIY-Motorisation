@@ -10,7 +10,7 @@ I did not use the switch at all, but instead altered the code to learn the top a
 
 A different ESP board was used:
 ESP32-C3 mini board
-<img width="827" height="1689" alt="image" src="https://github.com/user-attachments/assets/99a89f60-ef29-4585-828b-2351c7bf0294" />
+<img width="400" height="840" alt="image" src="https://github.com/user-attachments/assets/99a89f60-ef29-4585-828b-2351c7bf0294" />
 https://www.amazon.co.uk/dp/B0F8M9JWCG?ref=ppx_yo2ov_dt_b_fed_asin_title
 
 A different (similar type, but specifics matter) N20 motor was used: a brushed motor with a metal gearbox and encoder. In this case, it was: https://www.amazon.co.uk/dp/B0F8N6THR5?ref=ppx_yo2ov_dt_b_fed_asin_title&th=1with different GPIOS utilised, which meant wiring changed to this:
