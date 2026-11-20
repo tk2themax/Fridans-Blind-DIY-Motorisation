@@ -16,8 +16,8 @@ A different (similar type, but specifics matter) N20 motor was used: a brushed m
 
 Electronics are a work in progress, and no enclosure has been built yet.
 
-<img width="1200" height="1600" alt="WhatsApp Image 2026-11-20 at 11 19 39" src="https://github.com/user-attachments/assets/58942a6b-7199-4525-b1f9-6348894760e9" />
-<img width="1200" height="1600" alt="WhatsApp Image 2026-11-20 at 11 21 23" src="https://github.com/user-attachments/assets/f9ee6ff0-0f27-4680-bdaa-20cb5be54bef" />
+<img width="600" height="800" alt="WhatsApp Image 2026-11-20 at 11 19 39" src="https://github.com/user-attachments/assets/58942a6b-7199-4525-b1f9-6348894760e9" />
+<img width="600" height="800" alt="WhatsApp Image 2026-11-20 at 11 21 23" src="https://github.com/user-attachments/assets/f9ee6ff0-0f27-4680-bdaa-20cb5be54bef" />
 
 The motor is a little noisy, but lowering the speed makes it okay. This is not perfect, but I did not want to use a switch—it was too clunky for me.
 
