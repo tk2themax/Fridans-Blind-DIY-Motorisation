@@ -1,7 +1,5 @@
 Fork of the original project at https://github.com/AndBu/YAIFM/blob/main/README.md
 
-Changes:
-
 This project uses all the 3D models except:
 a) The switch holder
 b) Lid (PCB)
@@ -12,16 +10,23 @@ I did not use the switch at all, but instead altered the code to learn the top a
 
 A different (similar type, but specifics matter) N20 motor was used: a brushed motor with a metal gearbox and encoder. In this case, it was: https://www.amazon.co.uk/dp/B0F8N6THR5?ref=ppx_yo2ov_dt_b_fed_asin_title&th=1
 
+A different ESP board was used:
+ESP32-C3 mini board
+<img width="827" height="1689" alt="image" src="https://github.com/user-attachments/assets/99a89f60-ef29-4585-828b-2351c7bf0294" />
+https://www.amazon.co.uk/dp/B0F8M9JWCG?ref=ppx_yo2ov_dt_b_fed_asin_title
+
+with different GPIOS utilised, which meant wiring changed to this:
+<img width="2631" height="1315" alt="image" src="https://github.com/user-attachments/assets/83406372-54ad-4f00-abca-a482c309a512" />
 <img width="1059" height="1649" alt="image" src="https://github.com/user-attachments/assets/a5e98525-e5e9-42dc-be80-347920c015a2" />
 
-Electronics are a work in progress, and no enclosure has been built yet.
+Electronics are a work in progress on proto board, and no enclosure has been built yet.
 
 <img width="600" height="800" alt="WhatsApp Image 2026-11-20 at 11 19 39" src="https://github.com/user-attachments/assets/58942a6b-7199-4525-b1f9-6348894760e9" />
 <img width="600" height="800" alt="WhatsApp Image 2026-11-20 at 11 21 23" src="https://github.com/user-attachments/assets/f9ee6ff0-0f27-4680-bdaa-20cb5be54bef" />
 
-The motor is a little noisy, but lowering the speed makes it okay. This is not perfect, but I did not want to use a switch—it was too clunky for me.
+The motor is a little noisy, but lowering the speed makes it okay. This is not perfect, but I did not want to use a switch, which was too clunky for my taste.  An absolute physical nd stop with a swithing component may transpire as wise - time will tell.
 
-What is great is the neat mechanical integration into the blind roller. Most projects use external motors. I found that the small steppers used in this project https://www.thingiverse.com/thing:4889111/files to be too weak and not very quiet. Also, these steppers can slip when unpowered. The brushed DC motor with gearbox doesn't slip under power-down, which means the blind stays put. Home Assistant Cover Card is great, as it includes sensors for how far the blind has travelled, etc.
+What is great about this design (credit to the creator AndyBu, is the neat mechanical integration into the blind roller. Most projects use external motors. I found that the small steppers used in this project https://www.thingiverse.com/thing:4889111/files to be too weak and not very quiet. Also, these steppers can slip when unpowered. The brushed DC motor with gearbox doesn't slip under power-down, which means the blind stays put. Home Assistant Cover Card is great, as it includes sensors for how far the blind has travelled, etc.
 
 <img width="736" height="408" alt="image" src="https://github.com/user-attachments/assets/ad331743-ee63-4953-8550-1e5d3deca720" />
 
