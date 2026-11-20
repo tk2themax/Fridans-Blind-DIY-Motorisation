@@ -12,7 +12,7 @@ A different (similar type, but specifics matter) N20 motor was used: a brushed m
 
 In this case, it was: https://www.amazon.co.uk/dp/B0F8N6THR5?ref=ppx_yo2ov_dt_b_fed_asin_title&th=1
 
-<img width="1059" height="1649" alt="image" src="https://github.com/user-attachments/assets/a5e98525-e5e9-42dc-be80-347920c015a2" />
+<img width="400" height="700" alt="image" src="https://github.com/user-attachments/assets/a5e98525-e5e9-42dc-be80-347920c015a2" />
 
 A different ESP board was used (ESP32-C3 mini board) with different GPIOS utilised
 
