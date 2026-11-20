@@ -8,14 +8,13 @@ d) PCB holder
 
 I did not use the switch at all, but instead altered the code to learn the top and bottom limits based on that blind and the encoder counts and flash them to the microcontroller. It seems repeatable up and down for now.
 
-A different (similar type, but specifics matter) N20 motor was used: a brushed motor with a metal gearbox and encoder. In this case, it was: https://www.amazon.co.uk/dp/B0F8N6THR5?ref=ppx_yo2ov_dt_b_fed_asin_title&th=1
-
 A different ESP board was used:
 ESP32-C3 mini board
 <img width="827" height="1689" alt="image" src="https://github.com/user-attachments/assets/99a89f60-ef29-4585-828b-2351c7bf0294" />
 https://www.amazon.co.uk/dp/B0F8M9JWCG?ref=ppx_yo2ov_dt_b_fed_asin_title
 
-with different GPIOS utilised, which meant wiring changed to this:
+A different (similar type, but specifics matter) N20 motor was used: a brushed motor with a metal gearbox and encoder. In this case, it was: https://www.amazon.co.uk/dp/B0F8N6THR5?ref=ppx_yo2ov_dt_b_fed_asin_title&th=1with different GPIOS utilised, which meant wiring changed to this:
+
 <img width="2631" height="1315" alt="image" src="https://github.com/user-attachments/assets/83406372-54ad-4f00-abca-a482c309a512" />
 <img width="1059" height="1649" alt="image" src="https://github.com/user-attachments/assets/a5e98525-e5e9-42dc-be80-347920c015a2" />
 
