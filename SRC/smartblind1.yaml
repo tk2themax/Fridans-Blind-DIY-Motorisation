@@ -64,8 +64,7 @@ preferences:
 
 api:
   encryption:
-    key: ""
-
+    key: yANMKXkyhr3XJE2OJ9FZ7PyBCesBwzsTIIgIKJQPDac=
 ota:
   - platform: esphome
     encryption:
@@ -83,7 +82,7 @@ web_server:
   version: 2
   auth:
     username: smartblind1
-    password: !secret web_password
+    password: !secret web_server_password
     type: digest
 
 # ============================================================
